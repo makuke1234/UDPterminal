@@ -10,7 +10,7 @@ WARN=-Wall -Wextra -Wpedantic -Wconversion -Wunused-variable -Wshadow -Wpointer-
 CDEFFLAGS=-std=c11 $(WARN)
 CFLAGS=-O3 -Wl,--strip-all,--build-id=none,--gc-sections -fno-ident -D NDEBUG
 CFLAGSD=-g -O0 -D LOGGING_ENABLE=1
-LIB=
+LIB=-lws2_32
 
 
 default: debug
