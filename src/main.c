@@ -1,5 +1,11 @@
+#define WIN32_LEAN_AND_MEAN
+#define WIN32_EXTRA_LEAN
+#define NOMINMAX
+#include <Windows.h>
+
 #include "server.h"
 #include "client.h"
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +24,107 @@
 
 #define NUM_SERVERFORMATS 2
 #define NUM_CLIENTFORMATS 3
+
+#define MAX_RECORD 128
+
+static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer, int buflen)
+{
+	udpThread_t udpThread;
+	udpThread_init(udp, &udpThread);
+	if (!udpThread_read(&udpThread, buffer, buflen))
+	{
+		fprintf(stderr, "Async server receiver thread creation failed!\n");
+		exit(1);
+	}
+	
+	char sendBuf[BUFLEN];
+	int len = 0, idx = 0;
+	INPUT_RECORD records[MAX_RECORD];
+	HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+
+	printf("Send data:\n");
+	while (1)
+	{
+		DWORD nEvents;
+		if (ReadConsoleInputW(hStdIn, records, MAX_RECORD, &nEvents) && (nEvents > 0))
+		{
+			// Parse all events to buffer and possibly send out messages
+			bool breakFlag = false;
+			for (DWORD i = 0; i < nEvents; ++i)
+			{
+				INPUT_RECORD * event = &records[i];
+				if (event->EventType == KEY_EVENT)
+				{
+					KEY_EVENT_RECORD * kev = &event->Event.KeyEvent;
+					if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) && ((kev->wVirtualKeyCode == 'C') || (kev->wVirtualKeyCode == 'Z')))
+					{
+						breakFlag = true;
+						break;
+					}
+					else if (((!kev->bKeyDown) && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (MAX_BUF - 1)))
+					{
+						// Send data
+						sendBuf[len] = '\0';
+						if (strncmp(sendBuf, "exit", 4) == 0)
+						{
+							breakFlag = true;
+							break;
+						}
+						// Send message
+						udp_write(udp, sendBuf, len + 1);
+						printf("\nData sent.\n");
+
+						len = 0;
+						idx = 0;
+					}
+					else if (kev->bKeyDown && (kev->wRepeatCount == 1))
+					{
+						if (kev->uChar.AsciiChar >= ' ')
+						{
+							sendBuf[idx] = kev->uChar.AsciiChar;
+							putchar(sendBuf[idx]);
+							++idx;
+							if (idx > len)
+							{
+								len = idx;
+							}
+						}
+						else if ((kev->wVirtualKeyCode == VK_BACK) && (len > 0))
+						{
+							--len;
+							--idx;
+							putchar('\b');
+							putchar(' ');
+							putchar('\b');
+						}
+						else if ((kev->wVirtualKeyCode == VK_LEFT) && (idx > 0))
+						{
+							--idx;
+							putchar('\b');
+						}
+						else if ((kev->wVirtualKeyCode == VK_RIGHT) && (idx < len))
+						{
+							putchar(sendBuf[idx]);
+							++idx;
+						}
+					}
+				}
+			}
+			if (breakFlag)
+			{
+				printf("Exiting...\n");
+				break;
+			}
+		}
+		if (udpThread_hasIncome(&udpThread))
+		{
+			printf("Received data: \"%s\"\n", buffer);
+			udpThread_received(&udpThread);
+		}
+		Sleep(1);
+	}
+	udpThread_stopRead(&udpThread);
+}
 
 static inline int scanFunc(
 	const char * restrict input,
@@ -291,12 +398,7 @@ int main(int argc, char ** argv)
 			return 1;
 		}
 
-		while (1)
-		{
-			printf("Waiting for data...\n");
-			udpServer_read(&server, buffer, buflen);
-			printf("Received data: \"%s\"\n", buffer);
-		}
+		keyboardHandler(&server.u, buffer, buflen);
 
 		udpServer_close(&server);
 	}
@@ -314,32 +416,7 @@ int main(int argc, char ** argv)
 			return 1;
 		}
 
-		while (1)
-		{
-			printf("Send data: ");
-			if (fgets(buffer, buflen, stdin) == NULL)
-			{
-				printf("Exiting...");
-				break;
-			}
-			// Remove trailing newline
-			int len = (int)strlen(buffer);
-			if (buffer[len - 1] == '\n')
-			{
-				--len;
-				buffer[len] = '\0';
-			}
-
-			if (strcmp(buffer, "exit") == 0)
-			{
-				printf("Exiting...\n");
-				break;
-			}
-
-			printf("Sending data...\n");
-			udpClient_write(&client, buffer, len + 1);
-			printf("Data sent.\n");
-		}
+		keyboardHandler(&client.u, buffer, buflen);
 
 		udpClient_close(&client);
 	}

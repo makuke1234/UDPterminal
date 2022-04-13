@@ -40,3 +40,4 @@ bool udpServer_close(udpServer_t * restrict server)
 {
 	return udp_close(&server->u);
 }
+
