@@ -11,12 +11,12 @@ Like the name implies, this is just a testing application to test out the UDP pr
 
 ## Obtaining
 
-The latest release can be downloaded [here](https://github.com/makuke1234/UDPtest/releases/latest)
+The latest release can be downloaded [here](https://github.com/makuke1234/UDPtest/releases/latest).
 
 
 # Usage
 
-*Work in progess :/*
+![Usage 1](./images/usage.png)
 
 
 # License
