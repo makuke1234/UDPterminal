@@ -60,21 +60,27 @@ bool scanargs(
 	size_t numArgs
 )
 {
-	bool marked[argc];
-	memset(marked, 0, sizeof(bool) * (size_t)argc);
+	bool * marked = calloc((size_t)argc, sizeof(bool));
+	if (marked == NULL)
+	{
+		return false;
+	}
 
 	for (size_t i = 0; i < numArgs; ++i)
 	{
 		if (!scanarg(argc, argv, helpflag, marked, false, formats[i], bufs[i]))
 		{
+			free(marked);
 			return false;
 		}
 		if (*helpflag)
 		{
+			free(marked);
 			return true;
 		}
 	}
 
+	free(marked);
 	return true;
 }
 
