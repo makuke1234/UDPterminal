@@ -21,7 +21,7 @@
 bool scanarg(
 	int argc, char * const * argv, bool * helpflag,
 	bool * marked, bool ignoremarked,
-	const char * format, char * buf, size_t buflen
+	const char * format, char * buf
 )
 {
 	if (argc == 1)
@@ -41,7 +41,8 @@ bool scanarg(
 		}
 		else if (ignoremarked || !marked[i])
 		{
-			if (sscanf_s(argv[i], format, buf, buflen) > 0)
+			int res = sscanf(argv[i], format, buf);
+			if (res > 0 || strcmp(argv[i], format) == 0)
 			{
 				marked[i] = true;
 				return true;
@@ -55,8 +56,7 @@ bool scanargs(
 	int argc, char * const * argv,
 	bool * helpflag,
 	const char ** formats,
-	char ** bufs,
-	const size_t * buflens,
+	char bufs[NUM_BUFS][MAX_BUF],
 	size_t numArgs
 )
 {
@@ -65,11 +65,11 @@ bool scanargs(
 
 	for (size_t i = 0; i < numArgs; ++i)
 	{
-		if (!scanarg(argc, argv, helpflag, marked, false, formats[i], bufs[i], buflens[i]))
+		if (!scanarg(argc, argv, helpflag, marked, false, formats[i], bufs[i]))
 		{
 			return false;
 		}
-		if (helpflag)
+		if (*helpflag)
 		{
 			return true;
 		}
@@ -100,34 +100,24 @@ int main(int argc, char ** argv)
 
 	bool helpflag = false;
 	const char * serverFormats[NUM_SERVERFORMATS] = {
-		"-se%s",
-		"-port=%s"
+		"-server",
+		"-port=%6s"
 	};
 	const char * clientFormats[NUM_CLIENTFORMATS] = {
-		"-cl%s",
-		"-ip=%s",
-		"-port=%s"
+		"-client",
+		"-ip=%16s",
+		"-port=%6s"
 	};
 
-	char * bufs[NUM_BUFS];
-	size_t buflens[NUM_BUFS];
-	for (size_t i = 0; i < NUM_BUFS; ++i)
-	{
-		if ((bufs[i] = calloc(MAX_BUF, 1)) == NULL)
-		{
-			fprintf(stderr, "Error allocating memory!\n");
-			return 1;
-		}
-		buflens[i] = MAX_BUF;
-	}
+	char bufs[NUM_BUFS][MAX_BUF];
 
 	bool isServer = true;
-	if (!scanargs(argc, argv, &helpflag, serverFormats, bufs, buflens, NUM_SERVERFORMATS))
+	if (!scanargs(argc, argv, &helpflag, serverFormats, bufs, NUM_SERVERFORMATS))
 	{
 		if (!helpflag)
 		{
 			isServer = false;
-			if (!scanargs(argc, argv, &helpflag, clientFormats, bufs, buflens, NUM_CLIENTFORMATS))
+			if (!scanargs(argc, argv, &helpflag, clientFormats, bufs, NUM_CLIENTFORMATS))
 			{
 				fprintf(stderr, "Invalid arguments given!\n");
 				if (!helpflag)
@@ -136,10 +126,6 @@ int main(int argc, char ** argv)
 				}
 			}
 		}
-	}
-	for (size_t i = 0; i < NUM_BUFS; ++i)
-	{
-		free(bufs[i]);
 	}
 
 	if (helpflag)
@@ -180,8 +166,8 @@ int main(int argc, char ** argv)
 	}
 	else
 	{
-		uint16_t port = (uint16_t)atoi(bufs[1]);
-		const char * ip = bufs[2];
+		const char * ip = bufs[1];
+		uint16_t port = (uint16_t)atoi(bufs[2]);
 		printf("Configuration: IP: %s, port: %hu\n", ip, port);
 
 
