@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #define LOCALHOST "127.0.0.1"
 #define DEF_PORT 8888
@@ -18,12 +19,128 @@
 #define NUM_SERVERFORMATS 2
 #define NUM_CLIENTFORMATS 3
 
-bool scanarg(
-	int argc, char * const * argv, bool * helpflag,
-	bool * marked, bool ignoremarked,
-	const char * format, char * buf
+typedef int (*scanFunc_t)(
+	const char * restrict input,
+	const char * restrict format,
+	char * restrict outbuf
+);
+
+static inline int sscanf_wrap(
+	const char * restrict input,
+	const char * restrict format,
+	char * restrict outbuf
 )
 {
+	return sscanf(input, format, outbuf);
+}
+
+static inline int scanFunc(
+	const char * restrict input,
+	const char * restrict format,
+	char * restrict outbuf
+)
+{
+	assert(input  != NULL);
+	assert(format != NULL);
+	assert(outbuf != NULL);
+	
+	// Find the slash
+	const char * formtemp = format;
+	
+	for (; *formtemp != '\0'; ++formtemp)
+	{
+		if (*formtemp == '/')
+		{
+			break;
+		}
+	}
+	
+	const char * fullFMatch = format;
+	size_t required = 0;
+	if (*formtemp == '/')
+	{
+		required = (size_t)atoll(format);
+		fullFMatch = formtemp + 1;
+	}
+
+	++formtemp;
+	for (; *formtemp != '\0'; ++formtemp)
+	{
+		if (*formtemp == '=')
+		{
+			break;
+		}
+	}
+
+	size_t fullFMatchLen = (size_t)(formtemp - fullFMatch);
+	required = (required == 0) ? fullFMatchLen : required;
+
+	input += (input[0] == '-') + (input[1] == '-');
+	input += (input[0] == '/');
+
+	printf("FullFMatch: %s, %zu\n", fullFMatch, fullFMatchLen);
+	// First match the full
+	bool found = false;
+	for (size_t i = 0; i < fullFMatchLen; ++i)
+	{
+		if (input[i] == '=')
+		{
+			if (i < required || *formtemp != '=')
+			{
+				return -1;
+			}
+			input += i + 1;
+			found = true;
+			break;
+		}
+		else if (input[i] == '\0')
+		{
+			if (i < required)
+			{
+				return -1;
+			}
+			break;
+		}
+		else if (fullFMatch[i] != input[i])
+		{
+			return -1;
+		}
+	}
+	if (!found)
+	{
+		input += fullFMatchLen + 1;
+	}
+
+	printf("Data idx: %s\n", input);
+
+	if (*formtemp == '=')
+	{
+		++formtemp;
+		size_t maxChars = (size_t)atoll(formtemp);
+		size_t inpLen = strlen(input);
+		maxChars = (inpLen < maxChars) ? inpLen : maxChars;
+		memcpy(outbuf, input, maxChars);
+		outbuf[maxChars] = '\0';
+	}
+
+	return 1;
+}
+
+static inline bool scanarg(
+	int argc, char * const * restrict argv, bool * restrict helpflag,
+	bool * restrict marked, bool ignoremarked,
+	const char * restrict format, char * restrict buf,
+	scanFunc_t scanFunction
+)
+{
+	assert(argc >= 1);
+	assert(argv != NULL);
+	assert(helpflag != NULL);
+	assert(marked != NULL);
+	assert(format != NULL);
+	assert(buf != NULL);
+	assert(scanFunction != NULL);
+
 	if (argc == 1)
 	{
 		return false;
@@ -41,7 +158,7 @@ bool scanarg(
 		}
 		else if (ignoremarked || !marked[i])
 		{
-			int res = sscanf(argv[i], format, buf);
+			int res = scanFunction(argv[i], format, buf);
 			if (res > 0 || strcmp(argv[i], format) == 0)
 			{
 				marked[i] = true;
@@ -52,14 +169,22 @@ bool scanarg(
 
 	return false;
 }
-bool scanargs(
-	int argc, char * const * argv,
-	bool * helpflag,
-	const char ** formats,
-	char bufs[NUM_BUFS][MAX_BUF],
-	size_t numArgs
+static inline bool scanargs(
+	int argc, char * const * restrict argv, bool * restrict helpflag,
+	char * const * restrict formats, char * restrict bufs, size_t bufSize,
+	size_t numArgs,
+	scanFunc_t scanFunction
 )
 {
+	assert(argc >= 1);
+	assert(argv != NULL);
+	assert(helpflag != NULL);
+	assert(formats != NULL);
+	assert(bufs != NULL);
+	assert(bufSize >= 2);
+	assert(numArgs >= 1);	
+
+	scanFunction = (scanFunction == NULL) ? &sscanf_wrap : scanFunction;
 	bool * marked = calloc((size_t)argc, sizeof(bool));
 	if (marked == NULL)
 	{
@@ -68,7 +193,12 @@ bool scanargs(
 
 	for (size_t i = 0; i < numArgs; ++i)
 	{
-		if (!scanarg(argc, argv, helpflag, marked, false, formats[i], bufs[i]))
+		if (!scanarg(
+			argc, argv, helpflag,
+			marked, false,
+			formats[i], &bufs[bufSize * i],
+			scanFunction
+		))
 		{
 			free(marked);
 			return false;
@@ -84,14 +214,20 @@ bool scanargs(
 	return true;
 }
 
-void printhelp(const char * app)
+void printhelp(const char * restrict app)
 {
+	assert(app != NULL);
+
 	printf(
 		"Correct usage:\n"
 		"%s -server -port=[PORT NUMBER]\n"
 		"%s -client -ip=[IP ADDRESS] -port=[PORT NUMBER]\n"
 		"Miscellanious commands:\n"
-		"-help    -    Shows this page\n",
+		"-help    -    Shows this page\n\n"
+		"Methods for closing the program:\n"
+		"Ctrl+Z\n"
+		"Ctrl+C\n"
+		"exit\n",
 		app, app
 	);
 }
@@ -105,25 +241,25 @@ int main(int argc, char ** argv)
 	}
 
 	bool helpflag = false;
-	const char * serverFormats[NUM_SERVERFORMATS] = {
-		"-server",
-		"-port=%6s"
+	char * const serverFormats[NUM_SERVERFORMATS] = {
+		"1/server",
+		"1/port=6"
 	};
-	const char * clientFormats[NUM_CLIENTFORMATS] = {
-		"-client",
-		"-ip=%16s",
-		"-port=%6s"
+	char * const clientFormats[NUM_CLIENTFORMATS] = {
+		"1/client",
+		"1/ip=16",
+		"1/port=6"
 	};
 
 	char bufs[NUM_BUFS][MAX_BUF];
 
 	bool isServer = true;
-	if (!scanargs(argc, argv, &helpflag, serverFormats, bufs, NUM_SERVERFORMATS))
+	if (!scanargs(argc, argv, &helpflag, serverFormats, (char *)bufs, MAX_BUF, NUM_SERVERFORMATS, &scanFunc))
 	{
 		if (!helpflag)
 		{
 			isServer = false;
-			if (!scanargs(argc, argv, &helpflag, clientFormats, bufs, NUM_CLIENTFORMATS))
+			if (!scanargs(argc, argv, &helpflag, clientFormats, (char *)bufs, MAX_BUF, NUM_CLIENTFORMATS, &scanFunc))
 			{
 				fprintf(stderr, "Invalid arguments given!\n");
 				if (!helpflag)
@@ -187,7 +323,11 @@ int main(int argc, char ** argv)
 		while (1)
 		{
 			printf("Send data: ");
-			fgets(buffer, buflen, stdin);
+			if (fgets(buffer, buflen, stdin) == NULL)
+			{
+				printf("Exiting...");
+				break;
+			}
 			// Remove trailing newline
 			int len = (int)strlen(buffer);
 			if (buffer[len - 1] == '\n')
