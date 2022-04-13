@@ -19,21 +19,6 @@
 #define NUM_SERVERFORMATS 2
 #define NUM_CLIENTFORMATS 3
 
-typedef int (*scanFunc_t)(
-	const char * restrict input,
-	const char * restrict format,
-	char * restrict outbuf
-);
-
-static inline int sscanf_wrap(
-	const char * restrict input,
-	const char * restrict format,
-	char * restrict outbuf
-)
-{
-	return sscanf(input, format, outbuf);
-}
-
 static inline int scanFunc(
 	const char * restrict input,
 	const char * restrict format,
@@ -63,7 +48,7 @@ static inline int scanFunc(
 		fullFMatch = formtemp + 1;
 	}
 
-	++formtemp;
+	formtemp = (*formtemp != '\0') ? formtemp + 1 : formtemp;
 	for (; *formtemp != '\0'; ++formtemp)
 	{
 		if (*formtemp == '=')
@@ -78,7 +63,6 @@ static inline int scanFunc(
 	input += (input[0] == '-') + (input[1] == '-');
 	input += (input[0] == '/');
 
-	printf("FullFMatch: %s, %zu\n", fullFMatch, fullFMatchLen);
 	// First match the full
 	bool found = false;
 	for (size_t i = 0; i < fullFMatchLen; ++i)
@@ -111,8 +95,6 @@ static inline int scanFunc(
 		input += fullFMatchLen + 1;
 	}
 
-	printf("Data idx: %s\n", input);
-
 	if (*formtemp == '=')
 	{
 		++formtemp;
@@ -129,8 +111,7 @@ static inline int scanFunc(
 static inline bool scanarg(
 	int argc, char * const * restrict argv, bool * restrict helpflag,
 	bool * restrict marked, bool ignoremarked,
-	const char * restrict format, char * restrict buf,
-	scanFunc_t scanFunction
+	const char * restrict format, char * restrict buf
 )
 {
 	assert(argc >= 1);
@@ -139,26 +120,22 @@ static inline bool scanarg(
 	assert(marked != NULL);
 	assert(format != NULL);
 	assert(buf != NULL);
-	assert(scanFunction != NULL);
 
 	if (argc == 1)
 	{
+		buf[0] = '\0';
 		return false;
 	}
 	for (int i = 1; i < argc; ++i)
 	{
-		const char * str = argv[i];
-		str += *str == '-' || *str == '/';
-		str += *str == '-';
-		
-		if (strcmp(str, "help") == 0)
+		if (scanFunc(argv[i], "1/help", buf) >= 0 || scanFunc(argv[i], "?", buf) >= 0)
 		{
 			*helpflag = true;
 			return true;
 		}
 		else if (ignoremarked || !marked[i])
 		{
-			int res = scanFunction(argv[i], format, buf);
+			int res = scanFunc(argv[i], format, buf);
 			if (res > 0 || strcmp(argv[i], format) == 0)
 			{
 				marked[i] = true;
@@ -167,13 +144,22 @@ static inline bool scanarg(
 		}
 	}
 
+	buf[0] = '\0';
+	for (int i = 1; i < argc; ++i)
+	{
+		if (!marked[i])
+		{
+			strcpy(buf, argv[i]);
+			break;
+		}
+	}
+
 	return false;
 }
 static inline bool scanargs(
 	int argc, char * const * restrict argv, bool * restrict helpflag,
 	char * const * restrict formats, char * restrict bufs, size_t bufSize,
-	size_t numArgs,
-	scanFunc_t scanFunction
+	size_t numArgs
 )
 {
 	assert(argc >= 1);
@@ -184,10 +170,10 @@ static inline bool scanargs(
 	assert(bufSize >= 2);
 	assert(numArgs >= 1);	
 
-	scanFunction = (scanFunction == NULL) ? &sscanf_wrap : scanFunction;
 	bool * marked = calloc((size_t)argc, sizeof(bool));
 	if (marked == NULL)
 	{
+		bufs[0] = '\0';
 		return false;
 	}
 
@@ -196,11 +182,11 @@ static inline bool scanargs(
 		if (!scanarg(
 			argc, argv, helpflag,
 			marked, false,
-			formats[i], &bufs[bufSize * i],
-			scanFunction
+			formats[i], &bufs[bufSize * i]
 		))
 		{
 			free(marked);
+			strcpy(bufs, &bufs[bufSize * i]);
 			return false;
 		}
 		if (*helpflag)
@@ -254,14 +240,14 @@ int main(int argc, char ** argv)
 	char bufs[NUM_BUFS][MAX_BUF];
 
 	bool isServer = true;
-	if (!scanargs(argc, argv, &helpflag, serverFormats, (char *)bufs, MAX_BUF, NUM_SERVERFORMATS, &scanFunc))
+	if (!scanargs(argc, argv, &helpflag, serverFormats, (char *)bufs, MAX_BUF, NUM_SERVERFORMATS))
 	{
 		if (!helpflag)
 		{
 			isServer = false;
-			if (!scanargs(argc, argv, &helpflag, clientFormats, (char *)bufs, MAX_BUF, NUM_CLIENTFORMATS, &scanFunc))
+			if (!scanargs(argc, argv, &helpflag, clientFormats, (char *)bufs, MAX_BUF, NUM_CLIENTFORMATS))
 			{
-				fprintf(stderr, "Invalid arguments given!\n");
+				fprintf(stderr, "Un-recognized command-line option '%s'\n", bufs[0]);
 				if (!helpflag)
 				{
 					return 1;
@@ -288,7 +274,7 @@ int main(int argc, char ** argv)
 	if (isServer)
 	{
 		uint16_t port = (uint16_t)atoi(bufs[1]);
-		printf("Configuration: port: %hu\n", port);
+		printf("Configuration port: %hu\n", port);
 	
 		udpServer_t server;
 		if (!udpServer_open(&server, port))
@@ -310,7 +296,7 @@ int main(int argc, char ** argv)
 	{
 		const char * ip = bufs[1];
 		uint16_t port = (uint16_t)atoi(bufs[2]);
-		printf("Configuration: IP: %s, port: %hu\n", ip, port);
+		printf("Configuration IP: %s, port: %hu\n", ip, port);
 
 
 		udpClient_t client;
