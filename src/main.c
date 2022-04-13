@@ -65,6 +65,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 					{
 						// Send data
 						sendBuf[len] = '\0';
+						putchar('\n');
 						if (strncmp(sendBuf, "exit", 4) == 0)
 						{
 							breakFlag = true;
@@ -72,7 +73,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 						}
 						// Send message
 						udp_write(udp, sendBuf, len + 1);
-						printf("\nData sent.\n");
+						printf("Data sent.\n");
 
 						len = 0;
 						idx = 0;
