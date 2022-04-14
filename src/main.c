@@ -62,7 +62,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 						breakFlag = true;
 						break;
 					}
-					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (MAX_BUF - 1)))
+					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (buflen - 1)))
 					{
 						// Send data
 						sendBuf[len] = '\0';
