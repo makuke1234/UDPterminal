@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <conio.h>
 
 #define LOCALHOST "127.0.0.1"
 #define DEF_PORT 8888
@@ -46,7 +47,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 	while (1)
 	{
 		DWORD nEvents;
-		if (ReadConsoleInputW(hStdIn, records, MAX_RECORD, &nEvents) && (nEvents > 0))
+		if ((kbhit() || (GetAsyncKeyState(VK_CONTROL) & 0x8000)) && ReadConsoleInputW(hStdIn, records, MAX_RECORD, &nEvents) && (nEvents > 0))
 		{
 			// Parse all events to buffer and possibly send out messages
 			bool breakFlag = false;
@@ -61,7 +62,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 						breakFlag = true;
 						break;
 					}
-					else if (((!kev->bKeyDown) && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (MAX_BUF - 1)))
+					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (MAX_BUF - 1)))
 					{
 						// Send data
 						sendBuf[len] = '\0';
@@ -113,7 +114,6 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 			}
 			if (breakFlag)
 			{
-				printf("Exiting...\n");
 				break;
 			}
 		}
@@ -124,6 +124,8 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 		}
 		Sleep(1);
 	}
+
+	printf("Exiting...\n");
 	udpThread_stopRead(&udpThread);
 }
 
@@ -336,6 +338,8 @@ void printhelp(const char * restrict app)
 
 int main(int argc, char ** argv)
 {
+	SetConsoleCtrlHandler(NULL, TRUE);
+
 	if (!udp_init())
 	{
 		fprintf(stderr, "UDP initialization failed!\n");
