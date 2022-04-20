@@ -17,7 +17,13 @@ bool udpClient_open(udpClient_t * restrict client, const char * restrict ipstr, 
 
 	client->u.si_other.sin_family      = AF_INET;
 	client->u.si_other.sin_port        = htons(port);
-	client->u.si_other.sin_addr.s_addr = inet_addr(ipstr);
+	struct hostent * hostname = gethostbyname(ipstr);
+	const char * address = ipstr;
+	if (hostname != NULL)
+	{
+		address = inet_ntoa(**(struct in_addr **)(hostname->h_addr_list));
+	}
+	client->u.si_other.sin_addr.s_addr = inet_addr(address);
 
 	return true;
 }
