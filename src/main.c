@@ -21,14 +21,14 @@
 #define BUFLEN 128
 
 #define MAX_BUF MAX_PATH
-#define NUM_BUFS 3
+#define NUM_BUFS 4
 
-#define NUM_SERVERFORMATS 2
-#define NUM_CLIENTFORMATS 3
+#define NUM_SERVERFORMATS 3
+#define NUM_CLIENTFORMATS 4
 
 #define MAX_RECORD 128
 
-static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer, int buflen)
+static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer, int buflen, FILE * restrict fout)
 {
 	udpThread_t udpThread;
 	udpThread_init(udp, &udpThread);
@@ -62,7 +62,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 						breakFlag = true;
 						break;
 					}
-					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (buflen - 1)))
+					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (BUFLEN - 1)))
 					{
 						// Send data
 						sendBuf[len] = '\0';
@@ -119,7 +119,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 		}
 		if (udpThread_hasIncome(&udpThread))
 		{
-			printf("Received data: \"%s\"\n", buffer);
+			fwrite(buffer, buflen, 1, fout);
 			udpThread_received(&udpThread);
 		}
 		Sleep(1);
@@ -349,12 +349,14 @@ int main(int argc, char ** argv)
 	bool helpflag = false;
 	char * const serverFormats[NUM_SERVERFORMATS] = {
 		"1/server",
-		"1/port=6"
+		"1/output=260",
+		"1/port=6",
 	};
 	char * const clientFormats[NUM_CLIENTFORMATS] = {
 		"1/client",
-		"1/ip=16",
-		"1/port=6"
+		"1/output=260",
+		"1/port=6",
+		"1/ip=16"
 	};
 
 	char bufs[NUM_BUFS][MAX_BUF];
@@ -382,6 +384,14 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	int buflen = BUFLEN;
+
+	// Opens output file in binary mode
+	FILE * fout = fopen(bufs[1], "wb");
+	if (fout == NULL)
+	{
+		fprintf(stderr, "Error opening output file in binary write mode!\n");
+		return 1;
+	}
 	
 	buflen = (buflen < BUFLEN) ? BUFLEN : buflen;
 	char * buffer = malloc((size_t)buflen);
@@ -391,9 +401,10 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
+	uint16_t port = (uint16_t)atoi(bufs[2]);
+	
 	if (isServer)
 	{
-		uint16_t port = (uint16_t)atoi(bufs[1]);
 		printf("Configuration port: %hu\n", port);
 	
 		udpServer_t server;
@@ -403,14 +414,13 @@ int main(int argc, char ** argv)
 			return 1;
 		}
 
-		keyboardHandler(&server.u, buffer, buflen);
+		keyboardHandler(&server.u, buffer, buflen, fout);
 
 		udpServer_close(&server);
 	}
 	else
 	{
-		const char * ip = bufs[1];
-		uint16_t port = (uint16_t)atoi(bufs[2]);
+		const char * ip = bufs[3];
 		printf("Configuration IP: %s, port: %hu\n", ip, port);
 
 
@@ -421,15 +431,17 @@ int main(int argc, char ** argv)
 			return 1;
 		}
 
-		keyboardHandler(&client.u, buffer, buflen);
+		keyboardHandler(&client.u, buffer, buflen, fout);
 
 		udpClient_close(&client);
 	}
 
+	fclose(fout);
 
 	free(buffer);
 
 	udp_free();
+
 
 	return 0;
 }
