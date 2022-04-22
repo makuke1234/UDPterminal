@@ -62,7 +62,7 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 						breakFlag = true;
 						break;
 					}
-					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (buflen - 1)))
+					else if ((kev->bKeyDown && (kev->wVirtualKeyCode == VK_RETURN)) || (len >= (BUFLEN - 1)))
 					{
 						// Send data
 						sendBuf[len] = '\0';
@@ -353,8 +353,8 @@ int main(int argc, char ** argv)
 	};
 	char * const clientFormats[NUM_CLIENTFORMATS] = {
 		"1/client",
-		"1/ip=16",
-		"1/port=6"
+		"1/port=6",
+		"1/ip=16"
 	};
 
 	char bufs[NUM_BUFS][MAX_BUF];
@@ -391,9 +391,9 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
+	uint16_t port = (uint16_t)atoi(bufs[1]);
 	if (isServer)
 	{
-		uint16_t port = (uint16_t)atoi(bufs[1]);
 		printf("Configuration port: %hu\n", port);
 	
 		udpServer_t server;
@@ -409,8 +409,7 @@ int main(int argc, char ** argv)
 	}
 	else
 	{
-		const char * ip = bufs[1];
-		uint16_t port = (uint16_t)atoi(bufs[2]);
+		const char * ip = bufs[2];
 		printf("Configuration IP: %s, port: %hu\n", ip, port);
 
 
