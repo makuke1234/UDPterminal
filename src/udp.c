@@ -53,11 +53,12 @@ void udpThread_init(udp_t * restrict udp, udpThread_t * restrict uThread)
 		.u          = udp,
 		.hThread    = INVALID_HANDLE_VALUE,
 		.killSwitch = false,
-		.hasIncome  = false
+		.hasIncome  = false,
+		.fout       = NULL
 	};
 }
 
-#define UDP_THREAD_STACK_SIZE 20
+#define UDP_THREAD_STACK_SIZE 40
 #define UDP_THREAD_TIMEOUT_US 10
 
 static inline DWORD WINAPI s_udpThread_read_thread(LPVOID lpParams)
@@ -68,7 +69,7 @@ static inline DWORD WINAPI s_udpThread_read_thread(LPVOID lpParams)
 	fd_set currentSockets, readySockets;
 	FD_ZERO(&currentSockets);
 	FD_SET(uThread->u->s, &currentSockets);
-
+	
 	while (!uThread->killSwitch)
 	{
 		struct timeval timeout = {
@@ -86,21 +87,24 @@ static inline DWORD WINAPI s_udpThread_read_thread(LPVOID lpParams)
 
 		if (FD_ISSET(uThread->u->s, &readySockets))
 		{
-			if (udp_read(uThread->u, uThread->buffer, uThread->bufSize) > 0)
+			int numBytes = udp_read(uThread->u, uThread->buffer, uThread->bufSize);
+			if (numBytes > 0)
 			{
-				uThread->hasIncome = true;
+				// Set received packet size before setting the flag
+				fwrite(uThread->buffer, (size_t)numBytes, 1, uThread->fout);
 			}
 		}
 	}
 
 	return 0;
 }
-bool udpThread_read(udpThread_t * restrict uThread, void * restrict buffer, int bufSize)
+bool udpThread_read(udpThread_t * restrict uThread, void * restrict buffer, int bufSize, FILE * restrict fout)
 {
 	uThread->killSwitch = false;
 	uThread->hasIncome  = false;
 	uThread->buffer     = buffer;
 	uThread->bufSize    = bufSize;
+	uThread->fout       = fout;
 	uThread->hThread    = CreateThread(
 		NULL,
 		UDP_THREAD_STACK_SIZE,
@@ -110,14 +114,6 @@ bool udpThread_read(udpThread_t * restrict uThread, void * restrict buffer, int 
 		NULL
 	);
 	return uThread->hThread != INVALID_HANDLE_VALUE;
-}
-bool udpThread_hasIncome(const udpThread_t * restrict uThread)
-{
-	return uThread->hasIncome;
-}
-void udpThread_received(udpThread_t * restrict uThread)
-{
-	uThread->hasIncome = false;
 }
 
 bool udpThread_stopRead(udpThread_t * restrict uThread)

@@ -1,6 +1,7 @@
 #ifndef UDP_H
 #define UDP_H
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <WinSock2.h>
@@ -21,6 +22,8 @@ typedef struct udpThread
 	void * buffer;
 	int bufSize;
 
+	FILE * fout;
+
 } udpThread_t;
 
 bool udp_init(void);
@@ -36,9 +39,7 @@ bool udp_free(void);
 
 void udpThread_init(udp_t * restrict udp, udpThread_t * restrict uThread);
 
-bool udpThread_read(udpThread_t * restrict uThread, void * restrict buffer, int bufSize);
-bool udpThread_hasIncome(const udpThread_t * restrict uThread);
-void udpThread_received(udpThread_t * restrict uThread);
+bool udpThread_read(udpThread_t * restrict uThread, void * restrict buffer, int bufSize, FILE * restrict fout);
 
 bool udpThread_stopRead(udpThread_t * restrict uThread);
 
