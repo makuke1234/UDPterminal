@@ -18,7 +18,7 @@
 #define LOCALHOST "127.0.0.1"
 #define DEF_PORT 8888
 
-#define BUFLEN 128
+#define BUFLEN 1024
 
 #define MAX_BUF MAX_PATH
 #define NUM_BUFS 4
@@ -43,7 +43,8 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 	INPUT_RECORD records[MAX_RECORD];
 	HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
 
-	printf("Send data:\n");
+	printf("Ready to send data!\n");
+
 	while (1)
 	{
 		DWORD nEvents;
@@ -74,7 +75,6 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 						}
 						// Send message
 						udp_write(udp, sendBuf, len + 1);
-						printf("Data sent.\n");
 
 						len = 0;
 						idx = 0;
@@ -398,7 +398,7 @@ int main(int argc, char ** argv)
 		printhelp(argv[0]);
 		return 1;
 	}
-	int buflen = 2000000;
+	int buflen = BUFLEN;
 
 	// Opens output file in binary mode
 	FILE * fout = stdout;
