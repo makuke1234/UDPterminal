@@ -1,4 +1,4 @@
-TARGET=UDPtest
+TARGET=UDPterminal
 OBJ=obj
 OBJD=objd
 SRC=src
