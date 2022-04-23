@@ -263,7 +263,7 @@ static inline bool scanarg(
 }
 static inline bool scanargs(
 	int argc, char * const * restrict argv, bool * restrict helpflag,
-	char * const * restrict formats, char * restrict bufs, size_t bufSize,
+	char * const * restrict formats, const bool * restrict isOptional, char * restrict bufs, size_t bufSize,
 	size_t numArgs
 )
 {
@@ -271,6 +271,7 @@ static inline bool scanargs(
 	assert(argv != NULL);
 	assert(helpflag != NULL);
 	assert(formats != NULL);
+	assert(isOptional != NULL);
 	assert(bufs != NULL);
 	assert(bufSize >= 2);
 	assert(numArgs >= 1);	
@@ -290,9 +291,16 @@ static inline bool scanargs(
 			formats[i], &bufs[bufSize * i]
 		))
 		{
-			free(marked);
-			strcpy(bufs, &bufs[bufSize * i]);
-			return false;
+			if (!isOptional[i])
+			{
+				free(marked);
+				strcpy(bufs, &bufs[bufSize * i]);
+				return false;
+			}
+			else
+			{
+				bufs[bufSize * i] = '\0';
+			}
 		}
 		if (*helpflag)
 		{
@@ -348,22 +356,33 @@ int main(int argc, char ** argv)
 		"1/output=260",
 		"1/port=6",
 	};
+	bool serverOptional[NUM_SERVERFORMATS] = {
+		false,
+		true,
+		false
+	};
 	char * const clientFormats[NUM_CLIENTFORMATS] = {
 		"1/client",
 		"1/output=260",
 		"1/port=6",
 		"1/ip=16"
 	};
+	bool clientOptional[NUM_CLIENTFORMATS] = {
+		false,
+		true,
+		false,
+		false
+	};
 
 	char bufs[NUM_BUFS][MAX_BUF];
 
 	bool isServer = true;
-	if (!scanargs(argc, argv, &helpflag, serverFormats, (char *)bufs, MAX_BUF, NUM_SERVERFORMATS))
+	if (!scanargs(argc, argv, &helpflag, serverFormats, serverOptional, (char *)bufs, MAX_BUF, NUM_SERVERFORMATS))
 	{
 		if (!helpflag)
 		{
 			isServer = false;
-			if (!scanargs(argc, argv, &helpflag, clientFormats, (char *)bufs, MAX_BUF, NUM_CLIENTFORMATS))
+			if (!scanargs(argc, argv, &helpflag, clientFormats, clientOptional, (char *)bufs, MAX_BUF, NUM_CLIENTFORMATS))
 			{
 				fprintf(stderr, "Un-recognized command-line option '%s'\n", bufs[0]);
 				if (!helpflag)
@@ -382,11 +401,15 @@ int main(int argc, char ** argv)
 	int buflen = 2000000;
 
 	// Opens output file in binary mode
-	FILE * fout = fopen(bufs[1], "wb");
-	if (fout == NULL)
+	FILE * fout = stdout;
+	if (bufs[1][0] != '\0')
 	{
-		fprintf(stderr, "Error opening output file in binary write mode!\n");
-		return 1;
+		fout = fopen(bufs[1], "wb");
+		if (fout == NULL)
+		{
+			fprintf(stderr, "Error opening output file in binary write mode!\n");
+			return 1;
+		}
 	}
 	
 	buflen = (buflen < BUFLEN) ? BUFLEN : buflen;
