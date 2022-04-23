@@ -21,18 +21,18 @@
 #define BUFLEN 128
 
 #define MAX_BUF MAX_PATH
-#define NUM_BUFS 3
+#define NUM_BUFS 4
 
-#define NUM_SERVERFORMATS 2
-#define NUM_CLIENTFORMATS 3
+#define NUM_SERVERFORMATS 3
+#define NUM_CLIENTFORMATS 4
 
 #define MAX_RECORD 128
 
-static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer, int buflen)
+static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer, int buflen, FILE * restrict fout)
 {
 	udpThread_t udpThread;
 	udpThread_init(udp, &udpThread);
-	if (!udpThread_read(&udpThread, buffer, buflen))
+	if (!udpThread_read(&udpThread, buffer, buflen, fout))
 	{
 		fprintf(stderr, "Async server receiver thread creation failed!\n");
 		exit(1);
@@ -116,11 +116,6 @@ static inline void keyboardHandler(udp_t * restrict udp, char * restrict buffer,
 			{
 				break;
 			}
-		}
-		if (udpThread_hasIncome(&udpThread))
-		{
-			printf("Received data: \"%s\"\n", buffer);
-			udpThread_received(&udpThread);
 		}
 		Sleep(1);
 	}
@@ -317,16 +312,17 @@ void printhelp(const char * restrict app)
 	printf(
 		"Correct usage:\n"
 		"\n"
-		"%s --server --port=<port number>\n"
-		"%s --client --ip=<IP address> --port=<port number>\n"
+		"%s --server --port=<port number> --output=<file>\n"
+		"%s --client --ip=<IP address> --port=<port number> --output=<file>\n"
 		"\n"
 		"All switches:\n"
-		"  --help         -  Shows this page\n"
-		"  --?            -  Shows this page\n"
-		"  --server       -  Specifies server mode\n"
-		"  --client       -  Specifies client mode\n"
-		"  --ip=<addr>    -  Specifies <addr> as the IPv4 address to connect to\n"
-		"  --port=<port>  -  Specifies <port> as the port number in the range of 0 to 65535\n"
+		"  --help           -  Shows this page\n"
+		"  --?              -  Shows this page\n"
+		"  --server         -  Specifies server mode\n"
+		"  --client         -  Specifies client mode\n"
+		"  --ip=<addr>      -  Specifies <addr> as the IPv4 address to connect to\n"
+		"  --port=<port>    -  Specifies <port> as the port number in the range of 0 to 65535\n"
+		"  --output=<file>  -  Specifies the binary output file\n"
 		"\n"
 		"Methods for closing the program:\n"
 		"Ctrl+Z\n"
@@ -349,10 +345,12 @@ int main(int argc, char ** argv)
 	bool helpflag = false;
 	char * const serverFormats[NUM_SERVERFORMATS] = {
 		"1/server",
-		"1/port=6"
+		"1/output=260",
+		"1/port=6",
 	};
 	char * const clientFormats[NUM_CLIENTFORMATS] = {
 		"1/client",
+		"1/output=260",
 		"1/port=6",
 		"1/ip=16"
 	};
@@ -381,7 +379,15 @@ int main(int argc, char ** argv)
 		printhelp(argv[0]);
 		return 1;
 	}
-	int buflen = BUFLEN;
+	int buflen = 2000000;
+
+	// Opens output file in binary mode
+	FILE * fout = fopen(bufs[1], "wb");
+	if (fout == NULL)
+	{
+		fprintf(stderr, "Error opening output file in binary write mode!\n");
+		return 1;
+	}
 	
 	buflen = (buflen < BUFLEN) ? BUFLEN : buflen;
 	char * buffer = malloc((size_t)buflen);
@@ -391,7 +397,8 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
-	uint16_t port = (uint16_t)atoi(bufs[1]);
+	uint16_t port = (uint16_t)atoi(bufs[2]);
+	
 	if (isServer)
 	{
 		printf("Configuration port: %hu\n", port);
@@ -403,13 +410,13 @@ int main(int argc, char ** argv)
 			return 1;
 		}
 
-		keyboardHandler(&server.u, buffer, buflen);
+		keyboardHandler(&server.u, buffer, buflen, fout);
 
 		udpServer_close(&server);
 	}
 	else
 	{
-		const char * ip = bufs[2];
+		const char * ip = bufs[3];
 		printf("Configuration IP: %s, port: %hu\n", ip, port);
 
 
@@ -420,15 +427,17 @@ int main(int argc, char ** argv)
 			return 1;
 		}
 
-		keyboardHandler(&client.u, buffer, buflen);
+		keyboardHandler(&client.u, buffer, buflen, fout);
 
 		udpClient_close(&client);
 	}
 
+	fclose(fout);
 
 	free(buffer);
 
 	udp_free();
+
 
 	return 0;
 }
