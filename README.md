@@ -1,4 +1,4 @@
-# UDPtest
+# UDPterminal
 
 > A simple UDP client/server test application
 
