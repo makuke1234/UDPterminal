@@ -25,6 +25,11 @@ bool udpClient_open(udpClient_t * restrict client, const char * restrict ipstr, 
 	}
 	client->u.si_other.sin_addr.s_addr = inet_addr(address);
 
+	if (connect(client->u.s, (struct sockaddr *)&client->u.si_other, sizeof client->u.si_other))
+	{
+		return false;
+	}
+
 	return true;
 }
 int udpClient_read(udpClient_t * restrict client, void * restrict buffer, int bufSize)

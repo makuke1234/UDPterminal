@@ -21,7 +21,7 @@ void udp_zero(udp_t * restrict udp)
 int udp_read(udp_t * restrict udp, void * restrict buffer, int bufSize)
 {
 	int slen = sizeof(udp->si_other);
-	return recvfrom(udp->s, buffer, bufSize, 0,(struct sockaddr *)&udp->si_other, &slen);
+	return recvfrom(udp->s, buffer, bufSize, 0, (struct sockaddr *)&udp->si_other, &slen);
 }
 bool udp_write(const udp_t * restrict udp, const void * restrict buffer, int numBytes)
 {
