@@ -387,14 +387,14 @@ int main(int argc, char ** argv)
 				if (argc > 1)
 				{
 					fprintf(stderr, "Un-recognized command-line option '%s'\n", bufs[0]);
-					if (!*helpflag)
+					if (!helpflag)
 					{
 						return false;
 					}
 				}
 				else
 				{
-					*helpflag = true;
+					helpflag = true;
 				}
 			}
 		}
