@@ -384,10 +384,17 @@ int main(int argc, char ** argv)
 			isServer = false;
 			if (!scanargs(argc, argv, &helpflag, clientFormats, clientOptional, (char *)bufs, MAX_BUF, NUM_CLIENTFORMATS))
 			{
-				fprintf(stderr, "Un-recognized command-line option '%s'\n", bufs[0]);
-				if (!helpflag)
+				if (argc > 1)
 				{
-					return 1;
+					fprintf(stderr, "Un-recognized command-line option '%s'\n", bufs[0]);
+					if (!*helpflag)
+					{
+						return false;
+					}
+				}
+				else
+				{
+					*helpflag = true;
 				}
 			}
 		}
